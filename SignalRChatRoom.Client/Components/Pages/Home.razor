@@ -1,0 +1,574 @@
+﻿@page "/"
+@using Microsoft.AspNetCore.SignalR.Client
+@implements IAsyncDisposable
+
+@rendermode InteractiveServer
+
+<PageTitle>Chat Room</PageTitle>
+
+<style>
+    /* main-container {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        } */
+
+    main {
+        overflow-x: auto;
+    }
+
+    .container {
+        display: inline-flex;
+    }
+
+    .users {
+        width: 200px;
+        background-color: #f2f2f2;
+        padding: 20px;
+        border: 1px solid #e0e0e0;
+        box-sizing: border-box;
+    }
+
+        .users h3 {
+            margin-top: 0;
+            padding: 10px;
+        }
+
+        .users ul {
+            list-style-type: none;
+            overflow-y: auto;
+            max-height: 330px;
+            padding: 0;
+        }
+
+        .users .user {
+            cursor: pointer;
+            padding: 10px;
+            margin-bottom: 5px;
+            background-color: #e0e0e0;
+        }
+
+            .users .user.active {
+                background-color: #ffff;
+            }
+
+    .user.disabled {
+        pointer-events: none; /* Tıklanabilirliği devre dışı bırakır */
+        opacity: 0.5; /* Devre dışı bırakılmış gibi bir görünüm sağlar */
+    }
+
+    .conversation {
+        flex: 1;
+        padding: 20px;
+        border: 1px solid #e0e0e0;
+        box-sizing: border-box;
+        min-width: 400px;
+    }
+
+        .conversation .header {
+            background-color: #e0e0e0;
+            padding: 10px;
+            margin-bottom: 20px;
+        }
+
+    .messages {
+        overflow-y: auto;
+        max-height: 400px;
+        min-height: 400px;
+    }
+
+    .message {
+        padding: 10px;
+        margin-bottom: 10px;
+        border-radius: 5px;
+        /* max-width: 70%; */
+        max-width: max-content;
+    }
+
+    .sent {
+        background-color: #DCF8C6;
+        align-self: flex-end;
+        margin-right: 0px !important;
+        margin-left: auto; /* flexbox alignment rule */
+    }
+
+    .received {
+        background-color: #ECE5DD;
+    }
+
+    .time, .sender {
+        font-size: 12px;
+        color: #666;
+    }
+
+    button, input, optgroup, select, textarea {
+        margin: 0;
+        font-family: inherit;
+        font-size: inherit;
+        line-height: inherit;
+        max-width: -webkit-fill-available;
+    }
+
+    .input-area {
+        margin-top: 20px;
+    }
+
+        .input-area input {
+            width: calc(100% - 80px);
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px 0 0 5px;
+        }
+
+        .input-area button {
+            width: 70px;
+            padding: 10px;
+            background-color: #4CAF50;
+            color: #fff;
+            border: none;
+            border-radius: 0 5px 5px 0;
+            cursor: pointer;
+            float: right;
+        }
+
+            .input-area button:hover {
+                background-color: #45a049;
+            }
+
+    .addGroup {
+        margin-top: 10px;
+        /* background-color: #e0e0e0;
+            border: none;
+            border-radius: 0 5px 5px 0; */
+    }
+</style>
+
+@if (!IsAuthenticate)
+{
+    <Toasts class="p-3" Messages="AuthenticationMessages" AutoHide="true" StackLength="3" Placement="ToastsPlacement.TopRight" />
+
+    <div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);">
+        <Card Color="CardColor.Light" Class="mb-4" Style="width:18rem;">
+            <CardHeader>ChatRoom</CardHeader>
+            <CardBody>
+                <CardTitle>Sing Up</CardTitle>
+                <InputText style="padding: 10px 10px 10px 5px; display: block; width: 300px; border: none; border-bottom: 1px solid #757575;" @bind-Value="CallerUsername" placeholder="Enter name"></InputText>
+                <Button class="addGroup" Color="ButtonColor.Primary" @onclick=SignIn>
+                    Enter <i class="bi bi-box-arrow-in-right"></i>
+                </Button>
+            </CardBody>
+        </Card>
+    </div>
+}
+else
+{
+    @* <div class="main-container"> *@
+
+    <Toasts class="p-3" Messages="NotificationMessages" AutoHide="true" StackLength="3" Placement="ToastsPlacement.TopRight" />
+
+
+    <div class="container">
+
+        @* Сегмент комнат *@
+        <div class="users">
+            <h3>Rooms</h3>
+            <div>
+                <input style="padding: 10px 10px 10px 5px; display: block; width: 300px; border: none; border-bottom: 1px solid #757575;" type="text" @bind-value="GroupNameText" placeholder="Enter room name">
+                <Button class="addGroup" Color="ButtonColor.Primary" @onclick=@(() => AddGroup(GroupNameText)) style="margin-bottom: 10px;">
+                    <i class="bi bi-plus"></i> Add room
+                </Button>
+            </div>
+
+            <ul>
+                @foreach (var group in Groups)
+                {
+                    <Tooltip Class="me-4" Title="Click to enter the room and view participants." Placement="TooltipPlacement.Right">
+                        <li class="user @(group == selectedGroup ? "active" : "")" @onclick="@(() => SelectGroup(group))">@group.GroupName</li>
+                    </Tooltip>
+                }
+            </ul>
+        </div>
+        @* Список юзеров в определённой комнате *@
+        <div class="users" style="display: @displayStyle">
+            @if (!string.IsNullOrEmpty(selectedGroup.GroupName))
+            {
+                <h3>@selectedGroup.GroupName users </h3>
+                <ul>
+                    @foreach (var client in ClientsOfGroups)
+                    {
+                        <li class="user @(client.Username.Equals(CallerUsername) ? "disabled" : "")">@client.Username</li>
+                    }
+                </ul>
+            }
+        </div>
+
+        @*  @* Sistemdeki clientlar listeleniyor..
+    <div class="users">
+    <h3>Users online</h3>
+    <ul>
+    @foreach (var client in Clients)
+    {
+    <li class="user @(client == selectedClient ? "active" : "") @(client.Username.Equals(CallerUsername) ? "disabled" : "")" @onclick="@(() => SelectClient(client))"  >@client.Username</li>
+    }
+    </ul>
+    </div> *@
+
+        @* Callerın seçili clientlarla olan mesajları listeleniyor.. *@
+        <div class="conversation">
+            @if (selectedClient.Username != null)
+            {
+                <div class="header">
+                    <h3>@selectedClient.Username</h3>
+                </div>
+            }
+            else if (selectedGroup.GroupName != null)
+            {
+                <div class="header">
+                    <h3>@selectedGroup.GroupName</h3>
+                </div>
+            }
+
+            @* сообщения *@
+            <div class="messages">
+                @for (int i = 0; i < SelectedUserMessages.Count; i++)
+                {
+                    <div class="message @(SelectedUserMessages[i].IsSenderReceiver ? "sent" : "received")">
+                        @if (SelectedUserMessages[i].IsGroupMessage && !SelectedUserMessages[i].IsSenderReceiver)
+                        {
+                            <span class="sender">Gönderen : @SelectedUserMessages[i].SenderClientUsername</span>
+                        }
+                        <p>@SelectedUserMessages[i].Message</p>
+                        <span class="time">@SelectedUserMessages[i].CreatedDate.ToShortTimeString()</span>
+                    </div>
+                }
+            </div>
+
+            @* кнопка отправки *@
+            <div class="input-area">
+                <input @onkeyup="@(e => KeyHandler(e))" type="text" @bind-value="TextMessage" placeholder="Enter your message...">
+
+                <button @onclick=@(() => SendMessageAsync(TextMessage, selectedGroup.GroupName))>
+                    <i class="bi bi-send-fill"></i>
+                </button>
+
+            </div>
+        </div>
+
+        @* Sistemdeki clientlar listeleniyor.. *@
+        <div class="users">
+            <h3>Users online</h3>
+            <ul>
+                @foreach (var client in Clients)
+                {
+                    <li class="user @(client == selectedClient ? "active" : "") @(client.Username.Equals(CallerUsername) ? "disabled" : "")" @onclick="@(() => SelectClient(client))">@client.Username</li>
+                }
+            </ul>
+        </div>
+    </div>
+    @* </div> *@
+}
+
+@code {
+    private string displayStyle = "none"; // Видимость поля со списком клиентовOfGroup изначально скрыта.
+    List<ToastMessage> NotificationMessages = new List<ToastMessage>();
+
+    List<ClientMessage> Messages = new List<ClientMessage>(); // Список, в котором будут храниться сообщения, связанные с клиентом.
+
+    public string CallerUsername { get; set; } = String.Empty;
+    public string TextMessage { get; set; } = String.Empty;
+    public string GroupNameText { get; set; } = String.Empty;
+
+    // Проверяется, авторизовался клиент или нет
+    // Нет соединения с базой данных, данные хранятся в InMemory. Проверяется только, ввел ли клиент информацию об имени пользователя.
+    public bool IsAuthenticate { get; set; } = false;
+
+    private List<Client> ClientsOfGroups { get; set; } = new List<Client>();
+    private List<Client> Clients { get; set; } = new List<Client>(); // Все пользователи
+    class Client()
+    {
+        public string ConnectionId { get; set; }
+        public string Username { get; set; }
+    }
+    class ClientMessage()
+    {
+        public string ReceiverClientUsernameOrGroupName { get; set; }
+        public string SenderClientUsername { get; set; }
+        public string Message { get; set; }
+        public bool IsGroupMessage { get; set; } = false;
+        public bool IsSenderReceiver { get; set; } = false;
+        public DateTime CreatedDate { get; set; } = DateTime.Now;
+    }
+
+    private List<Group> Groups { get; set; } = new List<Group>();
+    class Group()
+    {
+        public string GroupName { get; set; }
+        public List<Client> Clients { get; } = new List<Client>();
+    }
+
+    private HubConnection hubConnection;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Подключение к SignalR
+        hubConnection = new HubConnectionBuilder()
+        .WithUrl("https://localhost:7038/chathub")
+        .Build();
+
+        #region Обработчики hubConnection
+        hubConnection.On<string>("clientJoined", async (username) =>
+        {
+            NotificationMessages.Add(CreateToastMessage(ToastType.Info, $"{username} has entered the chat."));
+
+            await InvokeAsync(StateHasChanged);
+        });
+
+        hubConnection.On<string>("clientLeaved", async (username) =>
+        {
+            NotificationMessages.Add(CreateToastMessage(ToastType.Info, $"{username} has left chat."));
+
+            await InvokeAsync(StateHasChanged);
+        });
+
+        hubConnection.On<List<Client>>("clients", async (clientList) =>
+        {
+            Clients = clientList;
+            await InvokeAsync(StateHasChanged);
+        });
+
+        hubConnection.On<List<Client>, string>("clientsOfGroup", async (clientList, groupName) =>
+        {
+            // Когда клиент завершает работу, он удаляется из всех подписанных групп, а их список обновляется и передается клиентам.
+            // Поэтому, пока выбранная группа клиента является кем-то другим, можно увидеть список клиентов последней группы..
+            // По этой причине список обновляется, когда выбранная клиентом группа равна группе, указанной в параметре.
+            if (selectedGroup.GroupName == groupName)
+            {
+                ClientsOfGroups = clientList;
+                await InvokeAsync(StateHasChanged);
+            }
+        });
+
+        hubConnection.On<string>("groupAdded", async (groupName) =>
+        {
+            NotificationMessages.Add(CreateToastMessage(ToastType.Info, $"{groupName} room has been added."));
+
+            await InvokeAsync(StateHasChanged);
+        });
+
+        hubConnection.On<List<Group>>("groups", async (groupList) =>
+        {
+            Groups = groupList;
+            await InvokeAsync(StateHasChanged);
+        });
+
+        // Если вызывающий абонент отправляет сообщение любому клиенту в системе, оно будет инициировано сервером.
+        hubConnection.On<string, Client, Client?, string?>("receiveMessage", async (message, senderClient, client, groupName) =>
+        {
+            if (client != null)
+            {
+                Messages.Add(new ClientMessage() { ReceiverClientUsernameOrGroupName = client.Username, SenderClientUsername = senderClient.Username, Message = message });
+
+                FilterUserMessages(selectedClient.Username, false);
+                await InvokeAsync(StateHasChanged);
+            }
+            else if (!string.IsNullOrEmpty(groupName))
+            {
+                Messages.Add(new ClientMessage() { ReceiverClientUsernameOrGroupName = groupName, SenderClientUsername = senderClient.Username, Message = message, IsGroupMessage = true, IsSenderReceiver = (senderClient.Username == CallerUsername) ? true : false });
+
+                FilterUserMessages(groupName, true);
+                await InvokeAsync(StateHasChanged);
+            }
+        });
+        #endregion
+
+        // Инициализирует соединение с хабом.
+        await hubConnection.StartAsync();
+
+        // Когда пользователь входит в систему, он извлекает список всех клиентов (клиент запускает сервер..)
+        await hubConnection.SendAsync("GetClientsAsync");
+    }
+
+    public async Task<bool> CheckUsernameAsync(string username)
+    {
+        Client client = Clients.FirstOrDefault(c => c.Username == username);
+        return (client != null) ? false : true;
+    }
+
+    public async Task<bool> CheckGroupNameAsync(string groupName)
+    {
+        Group group = Groups.FirstOrDefault(g => g.GroupName == groupName);
+        return (group != null) ? false : true;
+    }
+
+    List<ToastMessage> AuthenticationMessages = new List<ToastMessage>();
+
+    // Login
+    async Task SignIn()
+    {
+        if (!string.IsNullOrEmpty(CallerUsername))
+        {
+            bool result = await CheckUsernameAsync(CallerUsername);
+            if (result)
+            {
+                // При запуске метода GetUsernameAsync на сервере метод clientJoined на клиенте запускается сервером,
+                // на котором пользователь входит в систему и уведомляется обо всех клиентах, кроме вызывающего,
+                // и аналогичным образом обновляется список клиентов.
+                await hubConnection.SendAsync("GetUsernameAsync", CallerUsername);
+                IsAuthenticate = true;
+                await InvokeAsync(StateHasChanged);
+            }
+            else
+            {
+                AuthenticationMessages.Add(new ToastMessage()
+                    {
+                        Type = ToastType.Warning,
+                        Title = "Attention!",
+                        HelpText = $"{DateTime.Now}",
+                        Message = $"Username already taken!",
+                    });
+            }
+        }
+
+    }
+
+    List<ClientMessage> SelectedUserMessages = new List<ClientMessage>();
+
+
+    void FilterUserMessages(string receiverClientNameOrGroupName, bool IsGroupMessage)
+    {
+        if (IsGroupMessage)
+        {
+            if (selectedGroup.GroupName == null ? false : selectedGroup.GroupName.Equals(receiverClientNameOrGroupName) ? true : false)
+            {
+                SelectedUserMessages = Messages.Where(msg => (msg.ReceiverClientUsernameOrGroupName == receiverClientNameOrGroupName || msg.SenderClientUsername == receiverClientNameOrGroupName) && msg.IsGroupMessage).ToList();
+            }
+        }
+        else
+        {
+            if (selectedClient.Username == null ? false : selectedClient.Username.Equals(receiverClientNameOrGroupName) ? true : false)
+            {
+                SelectedUserMessages = Messages.Where(msg => (msg.ReceiverClientUsernameOrGroupName == receiverClientNameOrGroupName || msg.SenderClientUsername == receiverClientNameOrGroupName) && !msg.IsGroupMessage).ToList();
+            }
+        }
+
+        #region Альтернативный код фильтрации
+        // // Mesajları filtrelemek için kullanılacak koşulları önceden belirliyorum..
+        // Func<ClientMessage, bool> filterCondition = msg =>
+        //     (IsGroupMessage && msg.IsGroupMessage && msg.ReceiverClientUsernameOrGroupName == receiverClientNameOrGroupName) ||
+        //     (!IsGroupMessage && !msg.IsGroupMessage && (msg.ReceiverClientUsernameOrGroupName == receiverClientNameOrGroupName || msg.SenderClientUsername == receiverClientNameOrGroupName));
+
+        // // Gelen mesajlar bu filtreye göre filtreleniyor
+        // SelectedUserMessages = Messages.Where(filterCondition).ToList();
+        #endregion
+    }
+
+    private Client selectedClient = new Client();
+    private void SelectClient(Client client)
+    {
+        selectedClient = client;
+        selectedGroup = new Group();
+        FilterUserMessages(client.Username, false);
+    }
+
+    private Group selectedGroup = new Group();
+    private async Task SelectGroup(Group group)
+    {
+        selectedGroup = group;
+        selectedClient = new Client();
+        await AddClientToGroup(selectedGroup.GroupName);
+
+        await GetClientsOfGroup(selectedGroup.GroupName);
+
+        // Изменяет видимость области, в которой перечислены клиенты, принадлежащие к группе/комнате.
+        displayStyle = displayStyle == "none" ? "block" : "none";
+
+        FilterUserMessages(group.GroupName, true);
+    }
+
+    async Task SendMessageAsync(string message, string? groupName)
+    {
+        if (!string.IsNullOrEmpty(message))
+        {
+            if (!string.IsNullOrEmpty(groupName))
+            {
+                await hubConnection.SendAsync("SendMessageToGroupAsync", groupName, message);
+
+                FilterUserMessages(groupName, true);
+                StateHasChanged();
+            }
+            else
+            {
+                await hubConnection.SendAsync("SendMessageAsync", message, selectedClient);
+
+                Messages.Add(new ClientMessage() { Message = message, ReceiverClientUsernameOrGroupName = selectedClient.Username, SenderClientUsername = CallerUsername, IsSenderReceiver = true });
+
+                FilterUserMessages(selectedClient.Username, false);
+                StateHasChanged();
+            }
+            TextMessage = string.Empty;
+        }
+    }
+
+    async Task AddGroup(string groupNameText)
+    {
+        if (!string.IsNullOrEmpty(groupNameText))
+        {
+            bool result = await CheckGroupNameAsync(groupNameText);
+            if (result)
+            {
+                await hubConnection.SendAsync("AddGroupAsync", groupNameText);
+
+                groupNameText = string.Empty;
+
+                //groupNameText = ""; // Очищаем поле ввода
+                //StateHasChanged(); // Вызываем обновление UI
+            }
+            else
+            {
+                NotificationMessages.Add(new ToastMessage()
+                    {
+                        Type = ToastType.Warning,
+                        Title = "Attention!",
+                        HelpText = $"{DateTime.Now}",
+                        Message = $"A room with that name already exists!",
+                    });
+            }
+        }
+    }
+
+    async Task AddClientToGroup(string groupName)
+    {
+        await hubConnection.SendAsync("AddClientToGroupAsync", groupName);
+    }
+
+    async Task GetClientsOfGroup(string groupName)
+    {
+        await hubConnection.SendAsync("GetClientsOfGroupAsync", groupName);
+    }
+
+    // Отправка сообщения через Enter
+    private async Task KeyHandler(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await SendMessageAsync(TextMessage, selectedGroup.GroupName);
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection is not null)
+        {
+            await hubConnection.DisposeAsync();
+        }
+    }
+
+    private ToastMessage CreateToastMessage(ToastType toastType, string message)
+    => new ToastMessage
+        {
+            Type = toastType,
+            Title = "Alert",
+            HelpText = $"{DateTime.Now}",
+            Message = $"{message}",
+        };
+}

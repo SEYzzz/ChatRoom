@@ -19,6 +19,10 @@
 
     .container {
         display: inline-flex;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
     }
 
     .users {
@@ -53,8 +57,8 @@
             }
 
     .user.disabled {
-        pointer-events: none; /* Tıklanabilirliği devre dışı bırakır */
-        opacity: 0.5; /* Devre dışı bırakılmış gibi bir görünüm sağlar */
+        pointer-events: none; /* Отключает кликабельность */
+        opacity: 0.5; /* Обеспечивает представление, как если бы оно было отключено */
     }
 
     .conversation {
@@ -86,14 +90,14 @@
     }
 
     .sent {
-        background-color: #DCF8C6;
+        background-color: #E8F4FD; /* #DCF8C6; */
         align-self: flex-end;
         margin-right: 0px !important;
         margin-left: auto; /* flexbox alignment rule */
     }
 
     .received {
-        background-color: #ECE5DD;
+        background-color: #DFF9E8; /* #ECE5DD; */
     }
 
     .time, .sender {
@@ -165,106 +169,107 @@ else
     @* <div class="main-container"> *@
 
     <Toasts class="p-3" Messages="NotificationMessages" AutoHide="true" StackLength="3" Placement="ToastsPlacement.TopRight" />
-
-
+    
     <div class="container">
 
-        @* Сегмент комнат *@
-        <div class="users">
-            <h3>Rooms</h3>
-            <div>
-                <input style="padding: 10px 10px 10px 5px; display: block; width: 300px; border: none; border-bottom: 1px solid #757575;" type="text" @bind-value="GroupNameText" placeholder="Enter room name">
-                <Button class="addGroup" Color="ButtonColor.Primary" @onclick=@(() => AddGroup(GroupNameText)) style="margin-bottom: 10px;">
-                    <i class="bi bi-plus"></i> Add room
-                </Button>
-            </div>
+            @* Сегмент комнат *@
+            <div class="users">
+                <h3>Rooms</h3>
+                <div>
+                    <input style="padding: 10px 10px 10px 5px; display: block; width: 300px; border: none; border-bottom: 1px solid #757575;" type="text" @bind-value="GroupNameText" placeholder="Enter room name">
+                    <Button class="addGroup" Color="ButtonColor.Primary" @onclick=@(() => AddGroup(GroupNameText)) style="margin-bottom: 10px;">
+                        <i class="bi bi-plus"></i> Add room
+                    </Button>
+                </div>
 
-            <ul>
-                @foreach (var group in Groups)
-                {
-                    <Tooltip Class="me-4" Title="Click to enter the room and view participants." Placement="TooltipPlacement.Right">
-                        <li class="user @(group == selectedGroup ? "active" : "")" @onclick="@(() => SelectGroup(group))">@group.GroupName</li>
-                    </Tooltip>
-                }
-            </ul>
-        </div>
-        @* Список юзеров в определённой комнате *@
-        <div class="users" style="display: @displayStyle">
-            @if (!string.IsNullOrEmpty(selectedGroup.GroupName))
-            {
-                <h3>@selectedGroup.GroupName users </h3>
                 <ul>
-                    @foreach (var client in ClientsOfGroups)
+                    @foreach (var group in Groups)
                     {
-                        <li class="user @(client.Username.Equals(CallerUsername) ? "disabled" : "")">@client.Username</li>
+                        <Tooltip Class="me-4" Title="Click to enter the room and view participants." Placement="TooltipPlacement.Right">
+                            <li class="user @(group == selectedGroup ? "active" : "")" @onclick="@(() => SelectGroup(group))">@group.GroupName</li>
+                        </Tooltip>
                     }
                 </ul>
-            }
-        </div>
-
-        @*  @* Sistemdeki clientlar listeleniyor..
-    <div class="users">
-    <h3>Users online</h3>
-    <ul>
-    @foreach (var client in Clients)
-    {
-    <li class="user @(client == selectedClient ? "active" : "") @(client.Username.Equals(CallerUsername) ? "disabled" : "")" @onclick="@(() => SelectClient(client))"  >@client.Username</li>
-    }
-    </ul>
-    </div> *@
-
-        @* Callerın seçili clientlarla olan mesajları listeleniyor.. *@
-        <div class="conversation">
-            @if (selectedClient.Username != null)
-            {
-                <div class="header">
-                    <h3>@selectedClient.Username</h3>
-                </div>
-            }
-            else if (selectedGroup.GroupName != null)
-            {
-                <div class="header">
-                    <h3>@selectedGroup.GroupName</h3>
-                </div>
-            }
-
-            @* сообщения *@
-            <div class="messages">
-                @for (int i = 0; i < SelectedUserMessages.Count; i++)
+            </div>
+            @* Список юзеров в определённой комнате *@
+            <div class="users" style="display: @displayStyle">
+                @if (!string.IsNullOrEmpty(selectedGroup.GroupName))
                 {
-                    <div class="message @(SelectedUserMessages[i].IsSenderReceiver ? "sent" : "received")">
-                        @if (SelectedUserMessages[i].IsGroupMessage && !SelectedUserMessages[i].IsSenderReceiver)
+                    <h3>@selectedGroup.GroupName users </h3>
+                    <ul>
+                        @foreach (var client in ClientsOfGroups)
                         {
-                            <span class="sender">Gönderen : @SelectedUserMessages[i].SenderClientUsername</span>
+                            <li class="user @(client.Username.Equals(CallerUsername) ? "disabled" : "")">@client.Username</li>
                         }
-                        <p>@SelectedUserMessages[i].Message</p>
-                        <span class="time">@SelectedUserMessages[i].CreatedDate.ToShortTimeString()</span>
+                    </ul>
+                }
+            </div>
+
+            @*  @* Перечислены клиенты в системе..
+        <div class="users">
+        <h3>Users online</h3>
+        <ul>
+        @foreach (var client in Clients)
+        {
+        <li class="user @(client == selectedClient ? "active" : "") @(client.Username.Equals(CallerUsername) ? "disabled" : "")" @onclick="@(() => SelectClient(client))"  >@client.Username</li>
+        }
+        </ul>
+        </div> *@
+
+            @* Перечисляются сообщения вызывающего абонента с выбранными клиентами.. *@
+            <div class="conversation">
+                @if (selectedClient.Username != null)
+                {
+                    <div class="header">
+                        <h3>@selectedClient.Username</h3>
                     </div>
                 }
-            </div>
-
-            @* кнопка отправки *@
-            <div class="input-area">
-                <input @onkeyup="@(e => KeyHandler(e))" type="text" @bind-value="TextMessage" placeholder="Enter your message...">
-
-                <button @onclick=@(() => SendMessageAsync(TextMessage, selectedGroup.GroupName))>
-                    <i class="bi bi-send-fill"></i>
-                </button>
-
-            </div>
-        </div>
-
-        @* Sistemdeki clientlar listeleniyor.. *@
-        <div class="users">
-            <h3>Users online</h3>
-            <ul>
-                @foreach (var client in Clients)
+                else if (selectedGroup.GroupName != null)
                 {
-                    <li class="user @(client == selectedClient ? "active" : "") @(client.Username.Equals(CallerUsername) ? "disabled" : "")" @onclick="@(() => SelectClient(client))">@client.Username</li>
+                    <div class="header">
+                        <h3>@selectedGroup.GroupName</h3>
+                    </div>
                 }
-            </ul>
-        </div>
+
+                @* сообщения *@
+                <div class="messages">
+                    @for (int i = 0; i < SelectedUserMessages.Count; i++)
+                    {
+                        <div class="message @(SelectedUserMessages[i].IsSenderReceiver ? "sent" : "received")">
+                            @if (SelectedUserMessages[i].IsGroupMessage && !SelectedUserMessages[i].IsSenderReceiver)
+                            {
+                                <span class="sender">@SelectedUserMessages[i].SenderClientUsername</span>
+                            }
+                            <p>@SelectedUserMessages[i].Message</p>
+                            <span class="time">@SelectedUserMessages[i].CreatedDate.ToShortTimeString()</span>
+                        </div>
+                    }
+                </div>
+
+                @* кнопка отправки *@
+                <div class="input-area">
+                    <input @onkeyup="@(e => KeyHandler(e))" type="text" @bind-value="TextMessage" placeholder="Enter your message...">
+
+                    <button @onclick=@(() => SendMessageAsync(TextMessage, selectedGroup.GroupName))>
+                        <i class="bi bi-send-fill"></i>
+                    </button>
+
+                </div>
+            </div>
+
+            @* Перечислены клиенты в системе.. *@
+            <div class="users">
+                <h3>Users online</h3>
+                <ul>
+                    @foreach (var client in Clients)
+                    {
+                        <li class="user @(client == selectedClient ? "active" : "") @(client.Username.Equals(CallerUsername) ? "disabled" : "")" @onclick="@(() => SelectClient(client))">@client.Username</li>
+                    }
+                </ul>
+            </div>
     </div>
+
+    
     @* </div> *@
 }
 

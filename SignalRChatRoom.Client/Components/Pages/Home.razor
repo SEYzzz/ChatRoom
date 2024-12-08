@@ -4,7 +4,7 @@
 
 @rendermode InteractiveServer
 
-<PageTitle>Chat Room</PageTitle>
+<PageTitle>ChatRoom</PageTitle>
 
 <style>
     /* main-container {
@@ -23,11 +23,16 @@
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
+        /* background-color: #2D283E; */
+
+        border-top-color: #8028B1;
+        border-right-color: none;
+        border-left-color: none;
+        border-bottom-color: #8028B1;
     }
 
     .users {
         width: 200px;
-        background-color: #f2f2f2;
         padding: 20px;
         border: 1px solid #e0e0e0;
         box-sizing: border-box;
@@ -70,9 +75,10 @@
     }
 
         .conversation .header {
-            background-color: #e0e0e0;
+            background-color: #8028B1;
             padding: 10px;
             margin-bottom: 20px;
+            color: white;
         }
 
     .messages {
@@ -90,14 +96,14 @@
     }
 
     .sent {
-        background-color: #E8F4FD; /* #DCF8C6; */
+        background-color: #d1f1c0;
         align-self: flex-end;
         margin-right: 0px !important;
         margin-left: auto; /* flexbox alignment rule */
     }
 
     .received {
-        background-color: #DFF9E8; /* #ECE5DD; */
+        background-color: #dfc0f1;
     }
 
     .time, .sender {
@@ -127,7 +133,7 @@
         .input-area button {
             width: 70px;
             padding: 10px;
-            background-color: #4CAF50;
+            background-color: #8028B1;
             color: #fff;
             border: none;
             border-radius: 0 5px 5px 0;
@@ -136,28 +142,34 @@
         }
 
             .input-area button:hover {
-                background-color: #45a049;
+                background-color: #9730d0;
             }
 
     .addGroup {
         margin-top: 10px;
+        background-color: #8028B1;
+        color: white;
         /* background-color: #e0e0e0;
             border: none;
             border-radius: 0 5px 5px 0; */
     }
+
+        .addGroup:hover {
+            background-color: #9730d0;
+        }
+
 </style>
 
 @if (!IsAuthenticate)
 {
     <Toasts class="p-3" Messages="AuthenticationMessages" AutoHide="true" StackLength="3" Placement="ToastsPlacement.TopRight" />
-
     <div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);">
-        <Card Color="CardColor.Light" Class="mb-4" Style="width:18rem;">
+        <Card Color="CardColor.Dark" Class="mb-4" Style="width:18rem;">
             <CardHeader>ChatRoom</CardHeader>
             <CardBody>
                 <CardTitle>Sing Up</CardTitle>
                 <InputText style="padding: 10px 10px 10px 5px; display: block; width: 300px; border: none; border-bottom: 1px solid #757575;" @bind-Value="CallerUsername" placeholder="Enter name"></InputText>
-                <Button class="addGroup" Color="ButtonColor.Primary" @onclick=SignIn>
+                <Button class="addGroup" @onclick=SignIn>
                     Enter <i class="bi bi-box-arrow-in-right"></i>
                 </Button>
             </CardBody>
@@ -177,7 +189,7 @@ else
                 <h3>Rooms</h3>
                 <div>
                     <input style="padding: 10px 10px 10px 5px; display: block; width: 300px; border: none; border-bottom: 1px solid #757575;" type="text" @bind-value="GroupNameText" placeholder="Enter room name">
-                    <Button class="addGroup" Color="ButtonColor.Primary" @onclick=@(() => AddGroup(GroupNameText)) style="margin-bottom: 10px;">
+                    <Button class="addGroup" @onclick=@(() => AddGroup(GroupNameText)) style="margin-bottom: 10px;">
                         <i class="bi bi-plus"></i> Add room
                     </Button>
                 </div>
@@ -524,9 +536,7 @@ else
                 await hubConnection.SendAsync("AddGroupAsync", groupNameText);
 
                 groupNameText = string.Empty;
-
-                //groupNameText = ""; // Очищаем поле ввода
-                //StateHasChanged(); // Вызываем обновление UI
+                StateHasChanged();
             }
             else
             {
